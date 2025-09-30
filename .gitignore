@@ -1,3 +1,10 @@
-.env*
 .vscode
 .DS_Store
+
+.env*
+!.env.sample
+
+tmp/
+data/
+
+docker-compose.override.yml

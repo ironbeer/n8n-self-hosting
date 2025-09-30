@@ -1,0 +1,28 @@
+FROM n8nio/n8n:1.112.5
+
+USER root
+
+# Install Chrome dependencies and Chrome
+RUN apk add --no-cache \
+        git \
+        chromium \
+        nss \
+        glib \
+        freetype \
+        freetype-dev \
+        harfbuzz \
+        ca-certificates \
+        ttf-freefont \
+        udev \
+        ttf-liberation \
+        font-noto-emoji \
+        font-ipa \
+        font-noto-cjk \
+        fontconfig && \
+    fc-cache -f
+
+# Tell Puppeteer to use installed Chrome instead of downloading it
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+
+USER node

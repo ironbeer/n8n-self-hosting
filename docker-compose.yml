@@ -1,0 +1,128 @@
+x-common: &common
+  restart: unless-stopped
+  stop_grace_period: 60s
+  logging:
+    driver: json-file
+    options:
+      max-size: 64m
+      max-file: 4
+
+x-n8n-core-envs: &n8n-core-envs
+  # タイムゾーン設定
+  GENERIC_TIMEZONE: Asia/Tokyo
+  TZ: Asia/Tokyo
+  # DB設定
+  DB_TYPE: postgresdb
+  DB_POSTGRESDB_HOST:
+  DB_POSTGRESDB_PORT:
+  DB_POSTGRESDB_DATABASE:
+  DB_POSTGRESDB_USER:
+  DB_POSTGRESDB_PASSWORD:
+  DB_POSTGRESDB_SSL_ENABLED:
+  DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED:
+  # DB内のクレデンシャルの暗号化キー
+  N8N_ENCRYPTION_KEY:
+  # SMTPでのユーザ管理に使用するJWT(?)
+  N8N_USER_MANAGEMENT_JWT_SECRET:
+  # Webhookを受け付けるドメイン
+  # OAuth2コールバックURL等もこれになるので注意
+  WEBHOOK_URL:
+  # リバースプロキシの背後にある場合はプロキシ数を指定
+  N8N_PROXY_HOPS:
+  # HTTPSでのみCookieを許可する
+  # trueの場合はHTTPSかlocalhostでしかログインできない
+  N8N_SECURE_COOKIE:
+  # LISTEN設定
+  N8N_PROTOCOL: http
+  N8N_HOST: localhost
+  N8N_PORT: 5678
+  # ワーカーノードを使用
+  EXECUTIONS_MODE: queue
+  QUEUE_BULL_REDIS_HOST: redis
+  QUEUE_HEALTH_CHECK_ACTIVE: 'true'
+  # 手動実行をワーカー側で行う
+  OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS: 'true'
+  # JavaScriptに利用を許可するモジュール
+  NODE_FUNCTION_ALLOW_BUILTIN: '*'
+  NODE_FUNCTION_ALLOW_EXTERNAL: playwright
+  # JavaScriptから環境変数へのアクセスを禁止
+  N8N_BLOCK_ENV_ACCESS_IN_NODE: 'true'
+  # ワークフローが実行されなかった場合に放棄されたと見なす日数
+  N8N_SECURITY_AUDIT_DAYS_ABANDONED_WORKFLOW: 900
+  # 実行データの保存期間(時) デフォルト=336(14日)
+  EXECUTIONS_DATA_MAX_AGE: 336
+  # DBに保存する実行履歴の最大数 デフォルト=10000
+  EXECUTIONS_DATA_PRUNE_MAX_COUNT: 10000
+  # シャットダウンの待機時間
+  N8N_GRACEFUL_SHUTDOWN_TIMEOUT: 30
+  # 起動時に不足しているコミュニティノードの自動インストールを試みる
+  N8N_REINSTALL_MISSING_PACKAGES: 'true'
+  # バイナリファイルの保存先をRDBからファイルシステムに変更
+  N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+  N8N_BINARY_DATA_STORAGE_PATH: /binaryData
+  # セキュリティ強化のため設定ファイルのパーミッションを0600にする
+  N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+  # 統計情報の送信を無効化
+  N8N_DIAGNOSTICS_ENABLED: 'false'
+  # ユーザーへのパーソナライゼーション質問を無効化
+  N8N_PERSONALIZATION_ENABLED: 'false'
+  # UIに採用情報BANNERを表示しない
+  N8N_HIRING_BANNER_ENABLED: 'false'
+
+services:
+  n8n-main:
+    <<: *common
+    build:
+      dockerfile: ./dockerfiles/Dockerfile.n8n
+    environment:
+      <<: *n8n-core-envs
+    volumes:
+      - ./data/n8n-main:/home/node/.n8n
+      - ./data/n8n-binary-data:/binaryData
+    ports:
+      - 5678:5678
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  n8n-worker:
+    <<: *common
+    build:
+      dockerfile: ./dockerfiles/Dockerfile.n8n
+    privileged: true
+    command: worker
+    environment:
+      <<: *n8n-core-envs
+    volumes:
+      - ./data/n8n-worker:/home/node/.n8n
+      - ./data/n8n-binary-data:/binaryData
+    depends_on:
+      - n8n-main
+
+  postgres:
+    <<: *common
+    image: postgres:16
+    environment:
+      POSTGRES_DB: $DB_POSTGRESDB_DATABASE
+      POSTGRES_USER: $DB_POSTGRESDB_USER
+      POSTGRES_PASSWORD: $DB_POSTGRESDB_PASSWORD
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${DB_POSTGRESDB_USER} -d ${DB_POSTGRESDB_DATABASE}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    <<: *common
+    image: redis:6-alpine
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
