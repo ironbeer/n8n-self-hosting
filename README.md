@@ -18,3 +18,9 @@ docker-compose up -d
 ```
 
 [http://localhost:5678/](http://localhost:5678/)を開いてオーナーアカウントの設定を済ませたら完了。
+
+
+## 公式ドキュメント
+- [Self-hosting n8n](https://docs.n8n.io/hosting/)
+- [github.com/n8n-io/n8n-hosting](https://github.com/n8n-io/n8n-hosting/tree/main)
+- [github.com/n8n-io/self-hosted-ai-starter-kit](https://github.com/n8n-io/self-hosted-ai-starter-kit)
